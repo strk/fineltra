@@ -1,0 +1,7 @@
+/* config.h.in.  Generated from configure.ac by autoheader.  */
+
+/* Fineltra version */
+#undef FINELTRA_VERSION
+
+/* PostgreSQL server version */
+#undef PGSQL_VERSION

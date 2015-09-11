@@ -1,0 +1,19 @@
+-----------------------------------------------------------------------
+--
+-- Makefile.in
+--
+-- Copyright (C) 2015 Sandro Santilli <strk@keybit.net>
+--
+-- This is free software; you can redistribute and/or modify it under
+-- the terms of the GNU General Public Licence version 3 or later.
+-- See the COPYING file.
+--
+-----------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION ST_Fineltra(geom geometry,
+                                       triangles_table regclass,
+                                       source_column name,
+                                       target_column name)
+RETURNS geometry
+AS 'MODULE_PATHNAME','st_fineltra'
+LANGUAGE 'c' STABLE STRICT;

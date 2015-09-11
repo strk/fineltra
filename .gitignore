@@ -1,0 +1,10 @@
+Makefile
+autom4te.cache/
+fineltra_config.h
+config.log
+config.status
+configure
+fineltra.control
+*.o
+*.so
+*.sql

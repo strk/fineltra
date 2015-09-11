@@ -1,0 +1,7 @@
+# fineltra extension
+comment = 'functions to translate geometries using the FINELTRA algorithm'
+default_version = '@VERSION@'
+module_pathname = '$libdir/fineltra-@VERSION_MAJOR@'
+relocatable = true
+superuser = true
+#requires = 'postgis'

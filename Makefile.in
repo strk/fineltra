@@ -1,0 +1,60 @@
+#######################################################################
+#
+# Makefile.in
+#
+# Copyright (C) 2015 Sandro Santilli <strk@keybit.net>
+#
+# This is free software; you can redistribute and/or modify it under
+# the terms of the GNU General Public Licence version 3 or later.
+# See the COPYING file.
+#
+#######################################################################
+
+CC = @CC@
+CFLAGS = @CFLAGS@
+#PG_CONFIG = @PG_CONFIG@
+PGXS = @PGXS@
+
+OBJS = fineltra.o
+
+SED = sed
+EXTENSION = fineltra
+EXTVERSION = $(shell cat Version.config)
+EXTVERSION_MAJOR = $(shell echo $(EXTVERSION) | cut -d. -f1,2)
+MODULE_big = $(EXTENSION)-$(EXTVERSION_MAJOR)
+UPGRADABLE =
+
+UPGRADES = \
+  $(shell echo $(UPGRADABLE) | \
+     $(SED) 's/^/$(EXTENSION)--/' | \
+     $(SED) 's/$$/--$(EXTVERSION).sql/' | \
+     $(SED) 's/ /--$(EXTVERSION).sql $(EXTENSION)--/g') \
+  $(EXTENSION)--$(EXTVERSION)--$(EXTVERSION)next.sql \
+  $(EXTENSION)--$(EXTVERSION)next--$(EXTVERSION).sql
+
+DATA_built = \
+  $(EXTENSION).control \
+  $(EXTENSION)--$(EXTVERSION).sql
+
+REGRESS =
+
+# Add in build/link flags for lib
+#PG_CPPFLAGS += -I.
+#SHLIB_LINK += 
+
+# We are going to use PGXS for sure
+include $(PGXS)
+
+$(EXTENSION).control: $(EXTENSION).control.in Makefile
+	$(SED) -e 's/@VERSION@/$(EXTVERSION)/' \
+         -e 's/@VERSION_MAJOR@/$(EXTVERSION_MAJOR)/' $< > $@
+
+$(EXTENSION)--$(EXTVERSION).sql: $(EXTENSION).sql.in Makefile
+	$(SED) -e 's/@VERSION@/$(EXTVERSION)/' $< > $@
+
+# NOTE: relies on PERL being defined by PGXS
+$(EXTENSION)--%--$(EXTVERSION).sql: $(EXTENSION)--$(EXTVERSION).sql ../util/proc_upgrade.pl
+	cat $< | ../util/proc_upgrade.pl > $@
+
+$(EXTENSION)--%--$(EXTVERSION)next.sql: $(EXTENSION)--$(EXTVERSION)next--$(EXTVERSION).sql
+	ln -f $< $@
