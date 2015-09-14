@@ -10,10 +10,11 @@
 --
 -----------------------------------------------------------------------
 
-CREATE OR REPLACE FUNCTION ST_Fineltra(geom geometry,
+-- Takes and returns a PostGIS Geometry in OGC WKB form
+CREATE OR REPLACE FUNCTION ST_Fineltra(geom bytea,
                                        triangles_table regclass,
                                        source_column name,
                                        target_column name)
-RETURNS geometry
+RETURNS bytea
 AS 'MODULE_PATHNAME','st_fineltra'
 LANGUAGE 'c' STABLE STRICT;

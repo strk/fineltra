@@ -12,6 +12,8 @@
 
 CC = @CC@
 CFLAGS = @CFLAGS@
+LWGEOM_LDFLAGS = @LWGEOM_LDFLAGS@
+LWGEOM_CFLAGS = @LWGEOM_CFLAGS@
 #PG_CONFIG = @PG_CONFIG@
 PGXS = @PGXS@
 
@@ -34,13 +36,14 @@ UPGRADES = \
 
 DATA_built = \
   $(EXTENSION).control \
-  $(EXTENSION)--$(EXTVERSION).sql
+  $(EXTENSION)--$(EXTVERSION).sql \
+  $(EXTENSION)--$(EXTVERSION)--$(EXTVERSION)next.sql
 
 REGRESS =
 
 # Add in build/link flags for lib
-#PG_CPPFLAGS += -I.
-#SHLIB_LINK += 
+PG_CPPFLAGS += -I. $(LWGEOM_CFLAGS)
+SHLIB_LINK += $(LWGEOM_LDFLAGS)
 
 # We are going to use PGXS for sure
 include $(PGXS)
@@ -56,5 +59,9 @@ $(EXTENSION)--$(EXTVERSION).sql: $(EXTENSION).sql.in Makefile
 $(EXTENSION)--%--$(EXTVERSION).sql: $(EXTENSION)--$(EXTVERSION).sql ../util/proc_upgrade.pl
 	cat $< | ../util/proc_upgrade.pl > $@
 
-$(EXTENSION)--%--$(EXTVERSION)next.sql: $(EXTENSION)--$(EXTVERSION)next--$(EXTVERSION).sql
+$(EXTENSION)--$(EXTVERSION)--$(EXTVERSION)next.sql: $(EXTENSION)--$(EXTVERSION).sql
 	ln -f $< $@
+
+$(EXTENSION)--$(EXTVERSION)next--$(EXTVERSION).sql: $(EXTENSION)--$(EXTVERSION).sql
+	ln -f $< $@
+

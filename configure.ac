@@ -102,30 +102,19 @@ if test ! "$PGSQL_MAJOR_VERSION" -ge 9; then
 	AC_MSG_ERROR([Fineltra requires PostgreSQL >= 9.0])
 fi	
 
-dnl Extract the linker and include flags for the frontend (for programs that use libpq)
-PGSQL_FE_LDFLAGS=-L`$PG_CONFIG --libdir`" -lpq"
-PGSQL_FE_CPPFLAGS=-I`$PG_CONFIG --includedir`
-
-AC_SUBST([PGSQL_FE_LDFLAGS])
-AC_SUBST([PGSQL_FE_CPPFLAGS])
-
-dnl Ensure that we can parse libpq-fe.h
-CPPFLAGS_SAVE="$CPPFLAGS"
-CPPFLAGS="$PGSQL_FE_CPPFLAGS"
-AC_CHECK_HEADER([libpq-fe.h], [], [AC_MSG_ERROR([could not find libpq-fe.h])])
-CPPFLAGS="$CPPFLAGS_SAVE"
-
-dnl Ensure we can link against libpq
-LIBS_SAVE="$LIBS"
-LIBS="$PGSQL_FE_LDFLAGS"
-AC_CHECK_LIB([pq], [PQserverVersion],
-	[],
-	[AC_MSG_ERROR([could not find libpq])],
-	[])
-LIBS="$LIBS_SAVE"
-
 AC_DEFINE_UNQUOTED([PGSQL_VERSION], [$PGSQL_VERSION], [PostgreSQL server version])	
 AC_SUBST([PGSQL_VERSION])
+
+dnl ===========================================================================
+dnl Search for liblwgeom (2.0+ needed)
+dnl ===========================================================================
+
+AC_CHECK_LIB([lwgeom], [lwgeom_from_wkb],
+	[LWGEOM_LDFLAGS=-llwgeom],
+	[AC_MSG_ERROR([could not find liblwgeom])],
+	[])
+AC_SUBST(LWGEOM_LDFLAGS)
+AC_SUBST(LWGEOM_CFLAGS)
 
 dnl ===========================================================================
 dnl Output the relevant files
@@ -148,4 +137,6 @@ AC_MSG_RESULT()
 AC_MSG_RESULT([ -------------- Dependencies -------------- ])
 AC_MSG_RESULT([  PostgreSQL config:    ${PG_CONFIG}])
 AC_MSG_RESULT([  PostgreSQL version:   ${PGSQL_FULL_VERSION}])
+AC_MSG_RESULT([  liblwgeom ldflags:    ${LWGEOM_LDFLAGS}])
+AC_MSG_RESULT([  liblwgeom cflags:     ${LWGEOM_CFLAGS}])
 AC_MSG_RESULT()
