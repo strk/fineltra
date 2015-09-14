@@ -217,24 +217,109 @@ _box2d_to_hexwkb(const GBOX *bbox, int srid)
   return hex;
 }
 
-static const char *
-oid_to_tablename(Oid toid)
-{
-  StringInfoData sqldata;
-  StringInfo sql = &sqldata;
+#define MAXTABLENAME 1024
 
-  /* TODO: lookup cache in finfo ? */
-  initStringInfo(sql);
-  appendStringInfo(sql, "SELECT n.nspname, c.relname FROM "
+typedef struct CacheItemNameByOid_t
+{
+  Oid oid;
+  char tname[MAXTABLENAME];
+}
+CacheItemNameByOid;
+
+
+typedef struct {
+  CacheItemNameByOid nameByOid;
+} FineltraCache;
+
+/**
+* Utility function to read the upper memory context off a function
+* call
+* info data.
+*/
+static MemoryContext
+FIContext(FunctionCallInfoData* fcinfo)
+{
+  return fcinfo->flinfo->fn_mcxt;
+}
+
+
+/* return 1 if a cache for given oid existed, 0 otherwise */
+static int
+getNameByOidCache(FunctionCallInfo fcinfo, Oid toid, const char **nam)
+{
+  CacheItemNameByOid *cache = (CacheItemNameByOid*) fcinfo->flinfo->fn_extra;
+  if ( ! cache ) return 0;
+  if ( cache->oid != toid ) {
+    elog(WARNING, "Table name cache is being ineffective");
+    return 0;
+  }
+  *nam = cache->tname;
+  return 1;
+}
+
+/* set cache by oid */
+static void
+setNameByOidCache(FunctionCallInfo fcinfo, Oid toid, const char *nam)
+{
+  CacheItemNameByOid *cache = (CacheItemNameByOid*) fcinfo->flinfo->fn_extra;
+  if ( ! cache ) {
+    cache = fcinfo->flinfo->fn_extra = MemoryContextAlloc(
+        FIContext(fcinfo),
+        sizeof(CacheItemNameByOid)
+    );
+  }
+  cache->oid = toid;
+  strncpy(cache->tname, nam, MAXTABLENAME);
+}
+
+/* NOTE: it is expected that the caller invoked SPI_connect already */
+static const char *
+oid_to_tablename(FunctionCallInfo fcinfo, Oid toid)
+{
+  StringInfoData sql;
+  int spi_result;
+  static char buf[MAXTABLENAME]; /* TODO: use cache */
+  const char *namtab, *namsch;
+
+  if ( getNameByOidCache(fcinfo, toid, &namtab) )
+  {
+    return namtab;
+  }
+
+  initStringInfo(&sql);
+  appendStringInfo(&sql, "SELECT n.nspname, c.relname FROM "
     "pg_catalog.pg_namespace n, pg_catalog.pg_class c "
     "WHERE c.oid = %d AND n.oid = c.relnamespace",
     toid);
 
-  return "chenyx06_triangles"; /* XXX TODO: fix this! */
+  spi_result = SPI_execute(sql.data, true, 0);
+  if ( spi_result != SPI_OK_SELECT ) {
+    elog(ERROR, "unexpected return (%d) from query execution: %s", spi_result, sql.data);
+    pfree(sql.data);
+    return NULL;
+  }
+
+  if ( ! SPI_processed )
+  {
+    elog(ERROR, "Triangle table regclass (%d) does not exist", toid);
+    return NULL;
+  }
+
+  namsch = SPI_getvalue(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1);
+  namtab = SPI_getvalue(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 2);
+  if ( MAXTABLENAME <= snprintf(buf, MAXTABLENAME, "\"%s\".\"%s\"", namsch, namtab) )
+  {
+    elog(ERROR, "Table name too long"); /* FIXME */
+    return NULL;
+  }
+
+  setNameByOidCache(fcinfo, toid, buf);
+
+  return buf;
 }
 
 static FIN_TRISET *
-load_triangles(Oid toid, char *fsrc, char *ftgt, const LWGEOM* ext)
+load_triangles(FunctionCallInfo fcinfo, Oid toid, char *fsrc, char *ftgt, const LWGEOM* ext)
 {
   const char *tname_tri;
   char *hexbox;
@@ -244,7 +329,13 @@ load_triangles(Oid toid, char *fsrc, char *ftgt, const LWGEOM* ext)
   int i;
   const GBOX *box;
 
-  tname_tri = oid_to_tablename(toid);
+  if ( SPI_OK_CONNECT != SPI_connect() ) {
+    elog(ERROR, "Could not connect to SPI");
+    return NULL;
+  }
+
+  tname_tri = oid_to_tablename(fcinfo, toid);
+  if ( ! tname_tri ) return NULL;
 
   box = lwgeom_get_bbox(ext);
   if ( ! box ) {
@@ -255,16 +346,12 @@ load_triangles(Oid toid, char *fsrc, char *ftgt, const LWGEOM* ext)
   hexbox = _box2d_to_hexwkb(box, ext->srid);
 
   initStringInfo(&sql);
+
   appendStringInfo(&sql, "SELECT \"%s\"::bytea src,\"%s\"::bytea tgt "
                          "FROM %s "
-                         "WHERE ST_Intersects(\"%s\", '%s'::geometry)",
+                         "WHERE \"%s\" && '%s'::geometry",
                          fsrc, ftgt, tname_tri, fsrc, hexbox);
   lwfree(hexbox);
-
-  if ( SPI_OK_CONNECT != SPI_connect() ) {
-    elog(ERROR, "Could not connect to SPI");
-    return NULL;
-  }
 
   spi_result = SPI_execute(sql.data, true, 0);
   if ( spi_result != SPI_OK_SELECT ) {
@@ -353,8 +440,10 @@ Datum st_fineltra(PG_FUNCTION_ARGS)
   fname_tgt = PG_GETARG_NAME(3);
 
   /* 2. Fetch set of triangles overlapping input geometry */
-  triangles = load_triangles(toid, fname_src->data, fname_tgt->data, lwgeom);
+  triangles = load_triangles(fcinfo, toid, fname_src->data, fname_tgt->data, lwgeom);
   if ( ! triangles ) PG_RETURN_NULL();
+
+  elog(DEBUG1, "Fetched %d triangles intersecting input geometry", triangles->num);
 
   /* 3. For each vertex in input: */
   /* 3.1. Find source and target triangles from set */
