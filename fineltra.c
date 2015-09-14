@@ -125,6 +125,8 @@ typedef struct FIN_TRIANGLE_PAIR_T {
 
 typedef struct FIN_TRISET_T {
   int num;
+  int srid_src;
+  int srid_tgt;
   FIN_TRIANGLE_PAIR *pair;
 } FIN_TRISET;
 
@@ -145,7 +147,7 @@ fin_polygon_to_triangle(LWPOLY *poly, FIN_TRIANGLE *tri)
 }
 
 static int
-fin_datum_to_triangle(Datum dat, FIN_TRIANGLE *tri)
+fin_datum_to_triangle(Datum dat, FIN_TRIANGLE *tri, int *srid)
 {
   bytea *bytea_wkb;
   uint8_t *wkb;
@@ -155,6 +157,7 @@ fin_datum_to_triangle(Datum dat, FIN_TRIANGLE *tri)
   bytea_wkb = DatumGetByteaP( dat );
   wkb = (uint8_t*)VARDATA(bytea_wkb);
   lwgeom = lwgeom_from_wkb(wkb, VARSIZE(bytea_wkb)-VARHDRSZ, LW_PARSER_CHECK_ALL);
+  *srid = lwgeom->srid;
   lwpoly = lwgeom_as_lwpoly(lwgeom);
   if ( ! lwpoly )
   {
@@ -169,6 +172,19 @@ fin_datum_to_triangle(Datum dat, FIN_TRIANGLE *tri)
   }
   lwgeom_free(lwgeom);
   return 1;
+}
+
+static FIN_TRISET *
+fin_triset_create(size_t numtriangles)
+{
+  /* NOTE: we use SPI_palloc because the structure needs to survive
+   *       the SPI_finish call performed later */
+  FIN_TRISET *ret;
+  ret = SPI_palloc(sizeof(FIN_TRISET));
+  ret->num = numtriangles;
+  ret->srid_src = ret->srid_tgt = 0;
+  ret->pair = SPI_palloc(sizeof(FIN_TRIANGLE_PAIR)*numtriangles);
+  return ret;
 }
 
 static void
@@ -264,9 +280,7 @@ load_triangles(Oid toid, char *fsrc, char *ftgt, const LWGEOM* ext)
     return NULL;
   }
 
-  ret = palloc(sizeof(FIN_TRISET));
-  ret->num = SPI_processed;
-  ret->pair = palloc(sizeof(FIN_TRIANGLE_PAIR)*SPI_processed);
+  ret = fin_triset_create(SPI_processed);
   for (i=0; i<SPI_processed; ++i)
   {
     Datum dat;
@@ -277,7 +291,8 @@ load_triangles(Oid toid, char *fsrc, char *ftgt, const LWGEOM* ext)
     dat = SPI_getbinval(SPI_tuptable->vals[i], SPI_tuptable->tupdesc,
                         1, &isnull);
     assert ( ! isnull ); /* or it should have failed overlap test */
-    if ( ! fin_datum_to_triangle(dat, &(pair->src)) ) return NULL;
+    if ( ! fin_datum_to_triangle(dat, &(pair->src), &ret->srid_src) )
+      return NULL;
 
     /* tgt */
     dat = SPI_getbinval(SPI_tuptable->vals[i], SPI_tuptable->tupdesc,
@@ -288,7 +303,16 @@ load_triangles(Oid toid, char *fsrc, char *ftgt, const LWGEOM* ext)
       fin_triset_destroy(ret);
       return NULL;
     }
-    if ( ! fin_datum_to_triangle(dat, &(pair->tgt)) ) return NULL;
+    if ( ! fin_datum_to_triangle(dat, &(pair->tgt), &ret->srid_tgt) )
+      return NULL;
+  }
+
+  if ( ret->srid_src != ext->srid )
+  {
+    elog(ERROR, "Source triangle SRID (%d) not same as geometry SRID (%d)",
+                ret->srid_src, ext->srid);
+    fin_triset_destroy(ret);
+    return NULL;
   }
 
   SPI_finish();
@@ -330,6 +354,7 @@ Datum st_fineltra(PG_FUNCTION_ARGS)
 
   /* 2. Fetch set of triangles overlapping input geometry */
   triangles = load_triangles(toid, fname_src->data, fname_tgt->data, lwgeom);
+  if ( ! triangles ) PG_RETURN_NULL();
 
   /* 3. For each vertex in input: */
   /* 3.1. Find source and target triangles from set */
