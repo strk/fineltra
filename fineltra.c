@@ -22,6 +22,10 @@ PG_MODULE_MAGIC;
 
 #define PGC_ERRMSG_MAXLEN 256
 
+#define ABS(x) (x<0?-x:x)
+
+#undef FIN_DEBUG
+
 static void *
 pg_alloc(size_t size)
 {
@@ -177,13 +181,11 @@ fin_datum_to_triangle(Datum dat, FIN_TRIANGLE *tri, int *srid)
 static FIN_TRISET *
 fin_triset_create(size_t numtriangles)
 {
-  /* NOTE: we use SPI_palloc because the structure needs to survive
-   *       the SPI_finish call performed later */
   FIN_TRISET *ret;
-  ret = SPI_palloc(sizeof(FIN_TRISET));
+  ret = palloc(sizeof(FIN_TRISET));
   ret->num = numtriangles;
   ret->srid_src = ret->srid_tgt = 0;
-  ret->pair = SPI_palloc(sizeof(FIN_TRIANGLE_PAIR)*numtriangles);
+  ret->pair = palloc(sizeof(FIN_TRIANGLE_PAIR)*numtriangles);
   return ret;
 }
 
@@ -328,6 +330,7 @@ load_triangles(FunctionCallInfo fcinfo, Oid toid, char *fsrc, char *ftgt, const 
   FIN_TRISET *ret;
   int i;
   const GBOX *box;
+  MemoryContext oldcontext;
 
   if ( SPI_OK_CONNECT != SPI_connect() ) {
     elog(ERROR, "Could not connect to SPI");
@@ -367,6 +370,7 @@ load_triangles(FunctionCallInfo fcinfo, Oid toid, char *fsrc, char *ftgt, const 
     return NULL;
   }
 
+  oldcontext = MemoryContextSwitchTo(FIContext(fcinfo));
   ret = fin_triset_create(SPI_processed);
   for (i=0; i<SPI_processed; ++i)
   {
@@ -393,6 +397,7 @@ load_triangles(FunctionCallInfo fcinfo, Oid toid, char *fsrc, char *ftgt, const 
     if ( ! fin_datum_to_triangle(dat, &(pair->tgt), &ret->srid_tgt) )
       return NULL;
   }
+  MemoryContextSwitchTo( oldcontext );
 
   if ( ret->srid_src != ext->srid )
   {
@@ -405,6 +410,212 @@ load_triangles(FunctionCallInfo fcinfo, Oid toid, char *fsrc, char *ftgt, const 
   SPI_finish();
 
   return ret;
+}
+
+/**
+* lw_segment_side()
+*
+* Return -1  if point Q is left of segment P
+* Return  1  if point Q is right of segment P
+* Return  0  if point Q is on or collinear to segment P
+*/
+static int
+fin_ptside(const POINT2D *p1, const POINT2D *p2, const POINT2D *q)
+{
+  int ret;
+  double side = ( (q->x - p1->x) * (p2->y - p1->y) - (p2->x - p1->x) * (q->y - p1->y) );
+  ret = side < 0 ? -1 : side > 0 ? 1 : 0;
+#ifdef FIN_DEBUG
+  elog(DEBUG1, "Side of POINT(%.15g %.15g) on "
+               "LINESTRING(%.15g %.15g, %.15g %.15g) is %g (%d)",
+               q->x, q->y, p1->x, p1->y, p2->x, p2->y, side, ret);
+#endif
+  return ret;
+}
+
+static int
+fin_triangle_covers_point(FIN_TRIANGLE *tri, POINT2D *pt)
+{
+  /* side of triangle, cache this in FIN_TRIANGLE ? */
+  int triside = fin_ptside(&tri->t1, &tri->t2, &tri->t3);
+  int side;
+
+  side = fin_ptside(&tri->t1, &tri->t2, pt);
+  if ( ! side ) return 1; /* on t1-t2 segment */
+  if ( side != triside ) return 0; /* wrong side */
+
+  side = fin_ptside(&tri->t2, &tri->t3, pt);
+  if ( ! side ) return 1; /* on t2-t3 segment */
+  if ( side != triside ) return 0; /* wrong side */
+
+  side = fin_ptside(&tri->t3, &tri->t1, pt);
+  if ( ! side ) return 1; /* on t3-t1 segment */
+  if ( side != triside ) return 0; /* wrong side */
+
+  return 1;
+}
+
+static FIN_TRIANGLE_PAIR *
+fin_find_triangle(FIN_TRISET *set, POINT2D *pt)
+{
+  int i;
+  for (i=0; i<set->num; ++i)
+  {
+    FIN_TRIANGLE_PAIR *pair = set->pair+i;
+    FIN_TRIANGLE *src = &(pair->src);
+    int covers = fin_triangle_covers_point(src, pt);
+
+#ifdef FIN_DEBUG
+    elog(DEBUG1, "Triangle LINESTRING(%.15g %.15g, %.15g %.15g, %.15g %.15g)"
+                 " covers POINT(%.15g %.15g) ? %d",
+                 src->t1.x, src->t1.y,
+                 src->t2.x, src->t2.y,
+                 src->t3.x, src->t3.y,
+                 pt->x, pt->y, covers);
+#endif
+
+    /* Both inside and on boundary are good */
+    if ( covers ) return pair;
+  }
+  return NULL;
+}
+
+static void
+fin_transform_point(POINT2D *from, POINT4D *to, FIN_TRIANGLE_PAIR *pair)
+{
+  FIN_TRIANGLE *src = &(pair->src);
+  FIN_TRIANGLE *tgt = &(pair->tgt);
+  POINT2D v1;
+  POINT2D v2;
+  POINT2D v3;
+
+  /* translation vectors for each point, source to target.
+   * NOTE: could be cached in TRIANGLE_PAIR */
+
+  v1.x = tgt->t1.x - src->t1.x;
+  v1.y = tgt->t1.y - src->t1.y;
+
+  v2.x = tgt->t2.x - src->t2.x;
+  v2.y = tgt->t2.y - src->t2.y;
+
+  v3.x = tgt->t3.x - src->t3.x;
+  v3.y = tgt->t3.y - src->t3.y;
+
+  {
+
+  /* areas of the three subtriangles, Fineltra Manual 4-5 */
+
+  /* P1 is opposite of t1 */
+  double P1 = ABS( 0.5 * ( from->x * (src->t2.y - src->t3.y) + src->t2.x * ( src->t3.y - from->y ) + src->t3.x * ( from->y - src->t2.y ) ) ) ;
+  /* P2 is opposite of t2 */
+  double P2 = ABS( 0.5 * ( from->x * (src->t1.y - src->t3.y) + src->t1.x * ( src->t3.y - from->y ) + src->t3.x * ( from->y - src->t1.y ) ) ) ;
+  /* P3 is opposite of t3 */
+  double P3 = ABS( 0.5 * ( from->x * (src->t1.y - src->t2.y) + src->t1.x * ( src->t2.y - from->y ) + src->t2.x * ( from->y - src->t1.y ) ) ) ;
+
+  /* NOTE: could be cached as this is the area of src triangle */
+  double PT = P1 + P2 + P3;
+
+  /* Final interpolation */
+  double dx = (v1.x*P1 + v2.x*P2 + v3.x*P3) / PT;
+  double dy = (v1.y*P1 + v2.y*P2 + v3.y*P3) / PT;
+
+  to->x = from->x + dx;
+  to->y = from->y + dy;
+
+  }
+}
+
+static int
+ptarray_fineltra(POINTARRAY *pa, FIN_TRISET *triangles)
+{
+  int i;
+
+  /* For each vertex in input: */
+  for (i=0; i<pa->npoints; ++i)
+  {
+    POINT2D pt;
+    POINT4D pt4d;
+    FIN_TRIANGLE_PAIR *pair;
+
+    /* Find source and target triangles from set */
+    getPoint2d_p(pa, i, &pt);
+    pair = fin_find_triangle(triangles, &pt);
+    if ( ! pair )
+    {
+      elog(ERROR, "Input vertex found outside all source triangles");
+      return 0;
+    }
+  
+#ifdef FIN_DEBUG
+    elog(DEBUG1, "Triangle LINESTRING(%.15g %.15g, %.15g %.15g, %.15g %.15g)"
+                 " contains POINT(%.15g %.15g)",
+                 pair->src.t1.x, pair->src.t1.y,
+                 pair->src.t2.x, pair->src.t2.y,
+                 pair->src.t3.x, pair->src.t3.y,
+                 pt.x, pt.y);
+#endif
+    fin_transform_point(&pt, &pt4d, pair);
+    ptarray_set_point4d(pa, i, &pt4d);
+  }
+
+  return 1;
+}
+
+static int
+lwgeom_fineltra(LWGEOM *geom, FIN_TRISET *triangles)
+{
+	int i;
+
+	/* No points to transform in an empty! */
+	if ( lwgeom_is_empty(geom) )
+		return 1;
+
+	switch(geom->type)
+	{
+		case POINTTYPE:
+		case LINETYPE:
+		case CIRCSTRINGTYPE:
+		case TRIANGLETYPE:
+		{
+			LWLINE *g = (LWLINE*)geom;
+      if ( ! ptarray_fineltra(g->points, triangles) ) return 0;
+			break;
+		}
+		case POLYGONTYPE:
+		{
+			LWPOLY *g = (LWPOLY*)geom;
+			for ( i = 0; i < g->nrings; i++ )
+			{
+        if ( ! ptarray_fineltra(g->rings[i], triangles) ) return 0;
+			}
+			break;
+		}
+		case MULTIPOINTTYPE:
+		case MULTILINETYPE:
+		case MULTIPOLYGONTYPE:
+		case COLLECTIONTYPE:
+		case COMPOUNDTYPE:
+		case CURVEPOLYTYPE:
+		case MULTICURVETYPE:
+		case MULTISURFACETYPE:
+		case POLYHEDRALSURFACETYPE:
+		case TINTYPE:
+		{
+			LWCOLLECTION *g = (LWCOLLECTION*)geom;
+			for ( i = 0; i < g->ngeoms; i++ )
+			{
+				if ( ! lwgeom_fineltra(g->geoms[i], triangles) ) return 0;
+			}
+			break;
+		}
+		default:
+		{
+			elog(ERROR, "lwgeom_fineltra: Cannot handle type '%s'",
+			          lwtype_name(geom->type));
+			return 0;
+		}
+	}
+	return 1;
 }
 
 Datum st_fineltra(PG_FUNCTION_ARGS);
@@ -443,13 +654,15 @@ Datum st_fineltra(PG_FUNCTION_ARGS)
   triangles = load_triangles(fcinfo, toid, fname_src->data, fname_tgt->data, lwgeom);
   if ( ! triangles ) PG_RETURN_NULL();
 
+#ifdef FIN_DEBUG
   elog(DEBUG1, "Fetched %d triangles intersecting input geometry", triangles->num);
+#endif
 
-  /* 3. For each vertex in input: */
-  /* 3.1. Find source and target triangles from set */
-  /* 3.2. Translate point from source to target */
-
-  elog(WARNING, "ST_Fineltra not implemented yet, returning input untouched");
+  if ( ! lwgeom_fineltra(lwgeom, triangles) )
+  {
+    elog(ERROR, "lwgeom_fineltra failed");
+    PG_RETURN_NULL();
+  }
 
   wkb = lwgeom_to_wkb(lwgeom, WKB_EXTENDED, &wkb_size);
 
