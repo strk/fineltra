@@ -617,7 +617,7 @@ lwgeom_fineltra(LWGEOM *geom, FIN_TRISET *triangles)
   }
 
   /* Update SRID to the target triangles in set */
-  lwgeom->srid = tri->srid_tgt;
+  geom->srid = triangles->srid_tgt;
 
   return 1;
 }
