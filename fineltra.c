@@ -564,58 +564,62 @@ ptarray_fineltra(POINTARRAY *pa, FIN_TRISET *triangles)
 static int
 lwgeom_fineltra(LWGEOM *geom, FIN_TRISET *triangles)
 {
-	int i;
+  int i;
 
-	/* No points to transform in an empty! */
-	if ( lwgeom_is_empty(geom) )
-		return 1;
+  /* No points to transform in an empty! */
+  if ( lwgeom_is_empty(geom) )
+    return 1;
 
-	switch(geom->type)
-	{
-		case POINTTYPE:
-		case LINETYPE:
-		case CIRCSTRINGTYPE:
-		case TRIANGLETYPE:
-		{
-			LWLINE *g = (LWLINE*)geom;
+  switch(geom->type)
+  {
+    case POINTTYPE:
+    case LINETYPE:
+    case CIRCSTRINGTYPE:
+    case TRIANGLETYPE:
+    {
+      LWLINE *g = (LWLINE*)geom;
       if ( ! ptarray_fineltra(g->points, triangles) ) return 0;
-			break;
-		}
-		case POLYGONTYPE:
-		{
-			LWPOLY *g = (LWPOLY*)geom;
-			for ( i = 0; i < g->nrings; i++ )
-			{
+      break;
+    }
+    case POLYGONTYPE:
+    {
+      LWPOLY *g = (LWPOLY*)geom;
+      for ( i = 0; i < g->nrings; i++ )
+      {
         if ( ! ptarray_fineltra(g->rings[i], triangles) ) return 0;
-			}
-			break;
-		}
-		case MULTIPOINTTYPE:
-		case MULTILINETYPE:
-		case MULTIPOLYGONTYPE:
-		case COLLECTIONTYPE:
-		case COMPOUNDTYPE:
-		case CURVEPOLYTYPE:
-		case MULTICURVETYPE:
-		case MULTISURFACETYPE:
-		case POLYHEDRALSURFACETYPE:
-		case TINTYPE:
-		{
-			LWCOLLECTION *g = (LWCOLLECTION*)geom;
-			for ( i = 0; i < g->ngeoms; i++ )
-			{
-				if ( ! lwgeom_fineltra(g->geoms[i], triangles) ) return 0;
-			}
-			break;
-		}
-		default:
-		{
-			elog(ERROR, "lwgeom_fineltra: Cannot handle type '%s'",
-			          lwtype_name(geom->type));
-			return 0;
-		}
-	}
-	return 1;
+      }
+      break;
+    }
+    case MULTIPOINTTYPE:
+    case MULTILINETYPE:
+    case MULTIPOLYGONTYPE:
+    case COLLECTIONTYPE:
+    case COMPOUNDTYPE:
+    case CURVEPOLYTYPE:
+    case MULTICURVETYPE:
+    case MULTISURFACETYPE:
+    case POLYHEDRALSURFACETYPE:
+    case TINTYPE:
+    {
+      LWCOLLECTION *g = (LWCOLLECTION*)geom;
+      for ( i = 0; i < g->ngeoms; i++ )
+      {
+        if ( ! lwgeom_fineltra(g->geoms[i], triangles) ) return 0;
+      }
+      break;
+    }
+    default:
+    {
+      elog(ERROR, "lwgeom_fineltra: Cannot handle type '%s'",
+                lwtype_name(geom->type));
+      return 0;
+    }
+  }
+
+  /* Update SRID to the target triangles in set */
+  lwgeom->srid = tri->srid_tgt;
+
+  return 1;
 }
 
 Datum st_fineltra(PG_FUNCTION_ARGS);
