@@ -31,7 +31,7 @@ dnl ===========================================================================
 dnl Version Information imported from Version.config
 dnl ===========================================================================
 
-FINELTRA_VERSION=`cat Version.config`
+FINELTRA_VERSION=`cat ${srcdir}/Version.config`
 AC_SUBST([FINELTRA_VERSION])
 AC_DEFINE_UNQUOTED([FINELTRA_VERSION], ["$FINELTRA_VERSION"], [Fineltra version])
 
