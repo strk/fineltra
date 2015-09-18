@@ -36,6 +36,7 @@ UPGRADES = \
 
 DATA_built = \
   $(EXTENSION).control \
+  $(EXTENSION).sql \
   $(EXTENSION)--$(EXTVERSION).sql \
   $(EXTENSION)--$(EXTVERSION)--$(EXTVERSION)next.sql
 
@@ -65,3 +66,5 @@ $(EXTENSION)--$(EXTVERSION)--$(EXTVERSION)next.sql: $(EXTENSION)--$(EXTVERSION).
 $(EXTENSION)--$(EXTVERSION)next--$(EXTVERSION).sql: $(EXTENSION)--$(EXTVERSION).sql
 	ln -f $< $@
 
+$(EXTENSION).sql: $(EXTENSION)--$(EXTVERSION).sql
+	$(SED) -e 's/MODULE_PATHNAME/$(MODULE_big)/' $< > $@
