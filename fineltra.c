@@ -165,7 +165,7 @@ fin_datum_to_triangle(Datum dat, FIN_TRIANGLE *tri, int *srid)
   lwpoly = lwgeom_as_lwpoly(lwgeom);
   if ( ! lwpoly )
   {
-    elog(ERROR, "Non-polygon source triangle found");
+    elog(ERROR, "Non-polygon triangle found");
     lwgeom_free(lwgeom);
     return 0;
   }
