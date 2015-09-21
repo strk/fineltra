@@ -26,6 +26,26 @@ PG_MODULE_MAGIC;
 
 #undef FIN_DEBUG
 
+#ifdef FIN_DEBUG
+static void
+debug_wkb(uint8_t *wkb, size_t wkb_size)
+{
+  size_t i;
+  char *buf, *ptr;
+  buf = lwalloc(wkb_size*2+1);
+  ptr = buf;
+  for (i=0; i<wkb_size; ++i)
+  {
+    deparse_hex(wkb[i], ptr);
+    ptr+=2;
+  }
+  *ptr = '\0';
+  elog(DEBUG1, "WKB(%d): %s", wkb_size, buf);
+  lwfree(buf);
+}
+#endif
+
+
 static void *
 pg_alloc(size_t size)
 {
@@ -160,12 +180,17 @@ fin_datum_to_triangle(Datum dat, FIN_TRIANGLE *tri, int *srid)
 
   bytea_wkb = DatumGetByteaP( dat );
   wkb = (uint8_t*)VARDATA(bytea_wkb);
+
+#ifdef FIN_DEBUG
+  debug_wkb(wkb, VARSIZE(bytea_wkb)-VARHDRSZ);
+#endif
+
   lwgeom = lwgeom_from_wkb(wkb, VARSIZE(bytea_wkb)-VARHDRSZ, LW_PARSER_CHECK_ALL);
   *srid = lwgeom->srid;
   lwpoly = lwgeom_as_lwpoly(lwgeom);
   if ( ! lwpoly )
   {
-    elog(ERROR, "Non-polygon triangle found");
+    elog(ERROR, "Non-polygon triangle found (%s)", lwtype_name(lwgeom_get_type(lwgeom)));
     lwgeom_free(lwgeom);
     return 0;
   }
