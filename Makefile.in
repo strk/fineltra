@@ -44,7 +44,7 @@ REGRESS =
 
 # Add in build/link flags for lib
 PG_CPPFLAGS += -I. $(LWGEOM_CFLAGS)
-SHLIB_LINK += $(LWGEOM_LDFLAGS)
+SHLIB_LINK += $(LWGEOM_LDFLAGS) `geos-config --clibs` -lproj -lSFCGAL
 
 # We are going to use PGXS for sure
 include $(PGXS)
