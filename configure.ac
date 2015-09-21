@@ -106,31 +106,13 @@ AC_DEFINE_UNQUOTED([PGSQL_VERSION], [$PGSQL_VERSION], [PostgreSQL server version
 AC_SUBST([PGSQL_VERSION])
 
 dnl ===========================================================================
-dnl Search for liblwgeom static library (2.0+ needed)
+dnl Search for liblwgeom (2.0+ needed)
 dnl ===========================================================================
 
-AC_ARG_WITH([liblwgeom],
-	[AS_HELP_STRING([--with-liblwgeom=FILE], [specify path to liblwgeom.a])],
-	[LIBLWGEOM="$withval"], [])
-
-if test x"$LIBLWGEOM" != "x"; then
-  if test -e "$LIBLWGEOM"; then
-    LWGEOM_LDFLAGS=$LIBLWGEOM
-  else
-	  AC_MSG_ERROR([$LIBLWGEOM: no such file or directory])
-  fi
-else
-  for dir in /usr/lib /usr/local/lib; do
-    if test -e "$dir"/liblwgeom.a; then
-      LWGEOM_LDFLAGS=${dir}/liblwgeom.a
-      break
-    fi
-  done
-  if test x"$LWGEOM_LDFLAGS" = "x"; then
-	  AC_MSG_ERROR([Cannot find liblwgeom.a, try --with-liblwgeom])
-  fi
-fi
-
+AC_CHECK_LIB([lwgeom], [lwgeom_from_wkb],
+	[LWGEOM_LDFLAGS=-llwgeom],
+	[AC_MSG_ERROR([could not find liblwgeom])],
+	[])
 AC_SUBST(LWGEOM_LDFLAGS)
 AC_SUBST(LWGEOM_CFLAGS)
 
