@@ -124,7 +124,10 @@ _PG_init(void)
   elog(LOG, "Fineltra (%s) module loaded", FINELTRA_VERSION);
 
   lwgeom_set_handlers(pg_alloc, pg_realloc, pg_free, pg_error, pg_notice);
+#ifdef FIN_DEBUG
+  /* NOTE: this is not necessarely present, was added in liblwgeom 2.2.0 */
   lwgeom_set_debuglogger(pg_debug);
+#endif
 }
 
 /* Module unload callback */
