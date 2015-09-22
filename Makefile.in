@@ -44,7 +44,7 @@ REGRESS_OPTS = --inputdir=regress --outputdir=regress --load-extension=postgis -
 
 # Add in build/link flags for lib
 PG_CPPFLAGS += -I. $(LWGEOM_CFLAGS)
-SHLIB_LINK += $(LWGEOM_LDFLAGS) `geos-config --clibs` -lproj -Wl,--exclude-libs,ALL
+SHLIB_LINK += $(LWGEOM_LDFLAGS) `geos-config --clibs` -Wl,--exclude-libs,ALL
 
 # We are going to use PGXS for sure
 include $(PGXS)
