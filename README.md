@@ -35,14 +35,18 @@ BUILDING
 
 Building and installing should be as simple as:
 
+``
   ./autogen.sh
   ./configure
   make
+``
 
 INSTALLING
 ==========
 
+``
   sudo make install
+``
 
 USING
 =====
