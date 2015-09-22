@@ -567,7 +567,8 @@ ptarray_fineltra(POINTARRAY *pa, FIN_TRISET *triangles)
     pair = fin_find_triangle(triangles, &pt);
     if ( ! pair )
     {
-      elog(ERROR, "Input vertex found outside all source triangles");
+      elog(ERROR, "Input vertex (%.15g %.15g) "
+                  "found outside all source triangles", pt.x, pt.y);
       return 0;
     }
   
