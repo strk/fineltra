@@ -1,4 +1,4 @@
-sudo: false
+sudo: true
 
 language: c
 
@@ -16,5 +16,5 @@ script:
   - ./autogen.sh
   - ./configure
   - make
-  - make install
+  - sudo make install
   - make installcheck
