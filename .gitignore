@@ -9,5 +9,6 @@ fineltra.control
 *.so
 *.sql
 !regress/sql/*.sql
+!regress/*.sql
 regress/results/
 regress/regression.*
