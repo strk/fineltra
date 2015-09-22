@@ -5,10 +5,8 @@ language: c
 addons:
   postgresql: "9.3"
 
-before-script:
-  - ./autogen.sh
-
 script:
+  - ./autogen.sh
   - ./configure
   - make
   - make install
