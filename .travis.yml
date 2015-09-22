@@ -9,6 +9,8 @@ addons:
     - postgresql-server-dev-9.3
     - postgresql-common
     - liblwgeom-dev
+    - libproj-dev
+    - libgeos-dev
 
 script:
   - ./autogen.sh
