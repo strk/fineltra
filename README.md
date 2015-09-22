@@ -11,8 +11,11 @@ Code is released as free software under the terms of the [GPL license]
 (COPYING), version 3 or later.
 
 
-BUILDING
-========
+DEPENDENCIES
+============
+
+Fineltra is a PostgreSQL extension, compatible with version 9.1
+and later.
 
 The code depends on the liblwgeom library shipped with PostGIS.
 The library needs to be linked statically to avoid clashes with
@@ -21,6 +24,9 @@ which is dlopened by the PostgreSQL backend.
 
 Once statically linked to liblwgeom (2.2.0+) the code is also
 compatible with older PostGIS version (tested with 1.5 upward).
+
+BUILDING
+========
 
 Building and installing should be as simple as:
 
@@ -33,3 +39,24 @@ INSTALLING
 
   sudo make install
 
+USING
+=====
+
+Make sure to have the extension loaded in the database:
+
+  CREATE EXTENSION fineltra
+
+The extension provides a ``ST_Fineltra`` function that takes
+a PostGIS Geometry object in EWKB form, the identifier of a table
+containing reference triangles and the name of the columns containing
+the source and the target triangles. It returns a PostGIS Geometry in
+EWKB form representing the input geometry translated using the
+appropriate triangle from the reference set.
+
+The reference triangle columns need be of type POLYGON where each
+polygon has exactly 4 vertices. Order of the vertices in the source
+and the target column polygons must match.
+
+The SRID of the source triangles must match the SRID of the input
+geometry. The output geometry will have the SRID of the target
+triangles.
