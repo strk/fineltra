@@ -509,7 +509,7 @@ fin_find_triangle(FIN_TRISET *set, POINT2D *pt)
 }
 
 static void
-fin_transform_point(POINT2D *from, POINT4D *to, FIN_TRIANGLE_PAIR *pair)
+fin_transform_point(POINT4D *pt, FIN_TRIANGLE_PAIR *pair)
 {
   FIN_TRIANGLE *src = &(pair->src);
   FIN_TRIANGLE *tgt = &(pair->tgt);
@@ -534,11 +534,11 @@ fin_transform_point(POINT2D *from, POINT4D *to, FIN_TRIANGLE_PAIR *pair)
   /* areas of the three subtriangles, Fineltra Manual 4-5 */
 
   /* P1 is opposite of t1 */
-  double P1 = ABS( 0.5 * ( from->x * (src->t2.y - src->t3.y) + src->t2.x * ( src->t3.y - from->y ) + src->t3.x * ( from->y - src->t2.y ) ) ) ;
+  double P1 = ABS( 0.5 * ( pt->x * (src->t2.y - src->t3.y) + src->t2.x * ( src->t3.y - pt->y ) + src->t3.x * ( pt->y - src->t2.y ) ) ) ;
   /* P2 is opposite of t2 */
-  double P2 = ABS( 0.5 * ( from->x * (src->t1.y - src->t3.y) + src->t1.x * ( src->t3.y - from->y ) + src->t3.x * ( from->y - src->t1.y ) ) ) ;
+  double P2 = ABS( 0.5 * ( pt->x * (src->t1.y - src->t3.y) + src->t1.x * ( src->t3.y - pt->y ) + src->t3.x * ( pt->y - src->t1.y ) ) ) ;
   /* P3 is opposite of t3 */
-  double P3 = ABS( 0.5 * ( from->x * (src->t1.y - src->t2.y) + src->t1.x * ( src->t2.y - from->y ) + src->t2.x * ( from->y - src->t1.y ) ) ) ;
+  double P3 = ABS( 0.5 * ( pt->x * (src->t1.y - src->t2.y) + src->t1.x * ( src->t2.y - pt->y ) + src->t2.x * ( pt->y - src->t1.y ) ) ) ;
 
   /* NOTE: could be cached as this is the area of src triangle */
   double PT = P1 + P2 + P3;
@@ -547,8 +547,8 @@ fin_transform_point(POINT2D *from, POINT4D *to, FIN_TRIANGLE_PAIR *pair)
   double dx = (v1.x*P1 + v2.x*P2 + v3.x*P3) / PT;
   double dy = (v1.y*P1 + v2.y*P2 + v3.y*P3) / PT;
 
-  to->x = from->x + dx;
-  to->y = from->y + dy;
+  pt->x += dx;
+  pt->y += dy;
 
   }
 }
@@ -561,13 +561,12 @@ ptarray_fineltra(POINTARRAY *pa, FIN_TRISET *triangles)
   /* For each vertex in input: */
   for (i=0; i<pa->npoints; ++i)
   {
-    POINT2D pt;
-    POINT4D pt4d;
+    POINT4D pt;
     FIN_TRIANGLE_PAIR *pair;
 
     /* Find source and target triangles from set */
-    getPoint2d_p(pa, i, &pt);
-    pair = fin_find_triangle(triangles, &pt);
+    getPoint4d_p(pa, i, &pt);
+    pair = fin_find_triangle(triangles, (POINT2D*)&pt);
     if ( ! pair )
     {
       elog(ERROR, "Input vertex (%.15g %.15g) "
@@ -583,8 +582,8 @@ ptarray_fineltra(POINTARRAY *pa, FIN_TRISET *triangles)
                  pair->src.t3.x, pair->src.t3.y,
                  pt.x, pt.y);
 #endif
-    fin_transform_point(&pt, &pt4d, pair);
-    ptarray_set_point4d(pa, i, &pt4d);
+    fin_transform_point(&pt, pair);
+    ptarray_set_point4d(pa, i, &pt);
   }
 
   return 1;

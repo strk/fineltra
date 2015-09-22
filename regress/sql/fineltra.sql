@@ -61,4 +61,13 @@ SELECT test( 'SRID=1;TIN(
               ((0.4 0.2,0.2 0.2,0.3 0.1,0.4 0.2))
              )'::geometry ) ;
 
+-- 3DZ line
+SELECT test( 'SRID=1;LINESTRING(0 0 2,0.5 0.5 4,2 0 6)'::geometry );
+
+-- 3DM line
+SELECT test( 'SRID=1;LINESTRING(0 0 3,0.5 0.5 2,2 0 1)'::geometry );
+
+-- 4D line
+SELECT test( 'SRID=1;LINESTRING(0 0 1 2,0.5 0.5 3 4,2 0 5 6)'::geometry );
+
 DROP FUNCTION test (g geometry);
