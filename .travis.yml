@@ -12,10 +12,6 @@ addons:
     - libproj-dev
     - libgeos-dev
 
-compiler:
-  - clang
-  - gcc
-
 script:
   - ./autogen.sh
   - ./configure
