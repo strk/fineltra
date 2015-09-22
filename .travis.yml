@@ -8,6 +8,7 @@ addons:
     packages:
     - postgresql-server-dev-9.3
     - postgresql-common
+    - liblwgeom-dev
 
 script:
   - ./autogen.sh
