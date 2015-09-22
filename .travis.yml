@@ -6,7 +6,7 @@ addons:
   postgresql: "9.3"
   apt:
     packages:
-    - postgresql-server-dev-all
+    - postgresql-server-dev-9.3
     - postgresql-common
 
 script:
