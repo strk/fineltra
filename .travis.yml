@@ -4,7 +4,8 @@ language: c
 
 addons:
   postgresql: "9.3"
-  postgresql-server-dev: "9.3"
+  postgresql-server-dev-all
+  postgresql-common
 
 script:
   - ./autogen.sh
