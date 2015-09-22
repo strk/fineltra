@@ -35,7 +35,7 @@ BUILDING
 
 Building and installing should be as simple as:
 
-```
+```sh
   ./autogen.sh
   ./configure
   make
@@ -44,7 +44,7 @@ Building and installing should be as simple as:
 INSTALLING
 ==========
 
-```
+```sh
   sudo make install
 ```
 
@@ -53,7 +53,9 @@ USING
 
 Make sure to have the extension loaded in the database:
 
+```sql
   CREATE EXTENSION fineltra
+```
 
 The extension provides a ``ST_Fineltra`` function that takes
 a PostGIS Geometry object in EWKB form, the identifier of a table
