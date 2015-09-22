@@ -79,8 +79,6 @@ static void pg_error(const char *fmt, va_list ap)
   __attribute__ (( format(printf, 1, 0) ));
 static void pg_notice(const char *fmt, va_list ap)
   __attribute__ (( format(printf, 1, 0) ));
-static void pg_debug(int level, const char *fmt, va_list ap)
-  __attribute__ (( format(printf, 2, 0) ));
 
 static void
 pg_error(const char *fmt, va_list ap)
@@ -104,6 +102,9 @@ pg_notice(const char *fmt, va_list ap)
   ereport(NOTICE, (errmsg_internal("%s", errmsg)));
 }
 
+#ifdef FIN_DEBUG
+static void pg_debug(int level, const char *fmt, va_list ap)
+  __attribute__ (( format(printf, 2, 0) ));
 static void
 pg_debug(int level, const char *fmt, va_list ap)
 {
@@ -116,6 +117,7 @@ pg_debug(int level, const char *fmt, va_list ap)
   else
     ereport(DEBUG5, (errmsg_internal("%s", errmsg)));
 }
+#endif
 
 void _PG_init(void);
 void
