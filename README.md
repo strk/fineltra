@@ -1,3 +1,8 @@
+[![Build Status]
+(https://secure.travis-ci.org/strk/fineltra.png)]
+(http://travis-ci.org/strk/fineltra)
+
+
 [PostgreSQL](http://postgresql.org/) extension to translate
 [PostGIS](http://www.postgis.net) geometries using the [FINELTRA algorithm](
 http://www.swisstopo.admin.ch/internet/swisstopo/en/home/topics/survey/lv95/lv03-lv95/chenyx06.html
