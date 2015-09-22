@@ -71,3 +71,11 @@ and the target column polygons must match.
 The SRID of the source triangles must match the SRID of the input
 geometry. The output geometry will have the SRID of the target
 triangles.
+
+It is highly recommended to create a GiST index on the source triangle
+column as it will be queried for each call to the ``ST_Fineltra``
+function. Example of creating such an index:
+
+```sql
+CREATE INDEX ON chenyx06_triangles USING GiST (geom_lv03);
+```
