@@ -8,3 +8,6 @@ fineltra.control
 *.o
 *.so
 *.sql
+!sql/*.sql
+results/
+regression.*

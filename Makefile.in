@@ -36,11 +36,11 @@ UPGRADES = \
 
 DATA_built = \
   $(EXTENSION).control \
-  $(EXTENSION).sql \
   $(EXTENSION)--$(EXTVERSION).sql \
   $(EXTENSION)--$(EXTVERSION)--$(EXTVERSION)next.sql
 
-REGRESS =
+REGRESS = fineltra
+REGRESS_OPTS = --inputdir=regress --outputdir=regress --load-extension=postgis --load-extension=fineltra
 
 # Add in build/link flags for lib
 PG_CPPFLAGS += -I. $(LWGEOM_CFLAGS)
@@ -65,6 +65,3 @@ $(EXTENSION)--$(EXTVERSION)--$(EXTVERSION)next.sql: $(EXTENSION)--$(EXTVERSION).
 
 $(EXTENSION)--$(EXTVERSION)next--$(EXTVERSION).sql: $(EXTENSION)--$(EXTVERSION).sql
 	ln -f $< $@
-
-$(EXTENSION).sql: $(EXTENSION)--$(EXTVERSION).sql
-	$(SED) -e 's/MODULE_PATHNAME/$(MODULE_big)/' $< > $@

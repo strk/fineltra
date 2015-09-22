@@ -1,0 +1,4 @@
+This is the working directory for pg_regress based tests.
+Tests are under the sql/ dir, expected results are under expected/.
+Tests to be run are to be listed in the REGRESS variable of the
+parent's dir Makefile.in file.
