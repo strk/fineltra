@@ -12,7 +12,7 @@
 --   column "x" does not exist
 --
 -- You can verify this by reverting static linking:
---  git revert 5d280c94f96f0c660625985624121329b8ff02f6
+--  git revert add6f39052da759bbc9844793b926e28b32ff324
 --
 -- Beside static linking, another fix would be building PostGIS-1.5
 -- so that it does NOT export symbols from the libraries it links to,
