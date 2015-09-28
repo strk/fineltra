@@ -48,6 +48,15 @@ INSTALLING
   sudo make install
 ```
 
+TESTING
+=======
+
+Only post-install checks are supported at the moment. Run:
+
+```sh
+  make installcheck
+```
+
 USING
 =====
 
@@ -63,6 +72,17 @@ containing reference triangles and the name of the columns containing
 the source and the target triangles. It returns a PostGIS Geometry in
 EWKB form representing the input geometry translated using the
 appropriate triangle from the reference set.
+
+Example usage:
+
+```sql
+  SELECT ST_Fineltra(
+      geom,
+      'chenyx06_triangles',
+      'geom_lv03',
+      'geom_lv95'
+    );
+```
 
 The reference triangle columns need be of type POLYGON where each
 polygon has exactly 4 vertices. Order of the vertices in the source
